@@ -12,7 +12,7 @@ public class Fish2DFollower : FollowerBase
     public override bool CanRegenerate => false;
     
     private const float CONSTRAINT = 25f;
-    private const float INTERPOLATION_SPEED = 0.15f;
+    private new const float INTERPOLATION_SPEED = 0.15f;
     
     private struct ChainSegment
     {
@@ -21,7 +21,7 @@ public class Fish2DFollower : FollowerBase
     }
     
     private ChainSegment rootDot;
-    private List<ChainSegment> chain;
+    private List<ChainSegment> chain = null!;
     private float curvature = 0f;
     
     public override void Initialize()
@@ -202,8 +202,9 @@ public class Fish2DFollower : FollowerBase
             var color = ImGui.ColorConvertFloat4ToU32(new Vector4(0.37f, 0.39f, 0.43f, 1f)); // #5f656e
             var outlineColor = ImGui.ColorConvertFloat4ToU32(new Vector4(1f, 1f, 1f, 0.82f));
             
-            drawList.AddConvexPolyFilled(ref points[0], points.Count, color);
-            drawList.AddPolyline(ref points[0], points.Count, outlineColor, ImDrawFlags.Closed, 1.5f);
+            var pointsArray = points.ToArray();
+            drawList.AddConvexPolyFilled(ref pointsArray[0], pointsArray.Length, color);
+            drawList.AddPolyline(ref pointsArray[0], pointsArray.Length, outlineColor, ImDrawFlags.Closed, 1.5f);
         }
     }
     
@@ -243,7 +244,8 @@ public class Fish2DFollower : FollowerBase
         if (points.Count >= 3)
         {
             var color = ImGui.ColorConvertFloat4ToU32(new Vector4(1f, 1f, 1f, 0.82f));
-            drawList.AddConvexPolyFilled(ref points[0], points.Count, color);
+            var pointsArray = points.ToArray();
+            drawList.AddConvexPolyFilled(ref pointsArray[0], pointsArray.Length, color);
         }
     }
     

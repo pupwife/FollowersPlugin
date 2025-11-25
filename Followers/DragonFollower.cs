@@ -28,10 +28,10 @@ public class DragonFollower : FollowerBase
     }
     
     private DragonParams dragonParams;
-    private List<Vector2> segments;
+    private List<Vector2> segments = null!;
     private float rad = 0f;
     private float frm;
-    private Random random;
+    private Random random = null!;
     
     public override void Initialize()
     {

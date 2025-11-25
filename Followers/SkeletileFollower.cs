@@ -13,18 +13,18 @@ public class SkeletileFollower : FollowerBase
     private class Segment
     {
         public Vector2 Position;
-        public Segment Parent;
+        public Segment? Parent;
         public List<Segment> Children = new();
         public float Size;
         public float Angle;
         public float DefaultAngle;
     }
     
-    private Segment root;
-    private List<Segment> allSegments;
+    private Segment? root;
+    private List<Segment> allSegments = null!;
     private int legCount;
     private float creatureSize;
-    private Random random;
+    private Random random = null!;
     
     public override void Initialize()
     {
@@ -206,7 +206,7 @@ public class SkeletileFollower : FollowerBase
     public override void Cleanup()
     {
         base.Cleanup();
-        root = null;
+            root = null!;
         allSegments?.Clear();
     }
 }
