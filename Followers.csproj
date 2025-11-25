@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <Project Sdk="Dalamud.NET.Sdk/13.1.0">
   <PropertyGroup>
+    <AssemblyName>Followers</AssemblyName>
     <Version>0.0.0.1</Version>
     <Description>A followers plugin.</Description>
     <PackageProjectUrl>https://github.com/pupwife/FollowersPlugin</PackageProjectUrl>
@@ -10,6 +11,10 @@
 
   <ItemGroup>
     <Content Include="Data\goat.png">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <Visible>false</Visible>
+    </Content>
+    <Content Include="Followers.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       <Visible>false</Visible>
     </Content>
