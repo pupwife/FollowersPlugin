@@ -187,9 +187,51 @@ public class SkeletileFollower : FollowerBase
             drawList.AddLine(segment.Parent.Position, segment.Position, color, 2f);
         }
         
-        // Draw joint
+        // Draw joint - matching JS: partial arc (3/4 circle) + triangle
         var r = 4f;
-        drawList.AddCircle(segment.Position, r, color, 0, 2f);
+        var absAngle = segment.Parent != null 
+            ? MathF.Atan2(segment.Position.Y - segment.Parent.Position.Y, segment.Position.X - segment.Parent.Position.X)
+            : 0f;
+        
+        // Draw partial arc from PI/4 to 7*PI/4 (3/4 circle)
+        var startAngle = MathF.PI / 4f + absAngle;
+        var endAngle = 7f * MathF.PI / 4f + absAngle;
+        
+        // Draw arc using multiple line segments
+        var arcPoints = new List<Vector2>();
+        const int arcSegments = 24; // 3/4 of 32 segments
+        for (int i = 0; i <= arcSegments; i++)
+        {
+            var t = i / (float)arcSegments;
+            var angle = startAngle + t * (endAngle - startAngle);
+            arcPoints.Add(new Vector2(
+                segment.Position.X + r * MathF.Cos(angle),
+                segment.Position.Y + r * MathF.Sin(angle)
+            ));
+        }
+        
+        // Draw arc outline
+        for (int i = 0; i < arcPoints.Count - 1; i++)
+        {
+            drawList.AddLine(arcPoints[i], arcPoints[i + 1], color, 2f);
+        }
+        
+        // Draw triangle pointing in direction of movement
+        var endPoint = new Vector2(
+            segment.Position.X + r * MathF.Cos(7f * MathF.PI / 4f + absAngle),
+            segment.Position.Y + r * MathF.Sin(7f * MathF.PI / 4f + absAngle)
+        );
+        var centerPoint = new Vector2(
+            segment.Position.X + r * MathF.Cos(absAngle) * MathF.Sqrt(2f),
+            segment.Position.Y + r * MathF.Sin(absAngle) * MathF.Sqrt(2f)
+        );
+        var startPoint = new Vector2(
+            segment.Position.X + r * MathF.Cos(MathF.PI / 4f + absAngle),
+            segment.Position.Y + r * MathF.Sin(MathF.PI / 4f + absAngle)
+        );
+        
+        drawList.AddLine(endPoint, centerPoint, color, 2f);
+        drawList.AddLine(centerPoint, startPoint, color, 2f);
         
         foreach (var child in segment.Children)
         {

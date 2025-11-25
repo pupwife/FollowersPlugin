@@ -148,7 +148,7 @@ public class Fish2DFollower : FollowerBase
         
         var points = new List<Vector2>();
         
-        // Calculate silhouette points
+        // Calculate silhouette points (matching JS logic exactly)
         var nextDot = chain[1].Position;
         var dx = nextDot.X - rootDot.Position.X;
         var dy = nextDot.Y - rootDot.Position.Y;
@@ -164,8 +164,8 @@ public class Fish2DFollower : FollowerBase
         for (int i = 0; i < chain.Count; i++)
         {
             var current = chain[i];
-            var reference = (i + 1 < chain.Count) ? chain[i + 1] : (i > 0 ? chain[i - 1] : current);
             var haveNext = i + 1 < chain.Count;
+            var reference = haveNext ? chain[i + 1] : (i > 0 ? chain[i - 1] : current);
             
             dx = reference.Position.X - current.Position.X;
             dy = reference.Position.Y - current.Position.Y;
@@ -182,8 +182,8 @@ public class Fish2DFollower : FollowerBase
         for (int i = chain.Count - 1; i >= 0; i--)
         {
             var current = chain[i];
-            var reference = (i > 0) ? chain[i - 1] : (i + 1 < chain.Count ? chain[i + 1] : current);
             var haveNext = i > 0;
+            var reference = haveNext ? chain[i - 1] : (i + 1 < chain.Count ? chain[i + 1] : current);
             
             dx = reference.Position.X - current.Position.X;
             dy = reference.Position.Y - current.Position.Y;
@@ -196,15 +196,49 @@ public class Fish2DFollower : FollowerBase
             points.Add(silhouettePoint);
         }
         
-        // Draw filled polygon
+        // Add final point to close the shape
+        if (points.Count > 0)
+        {
+            points.Add(points[0]);
+        }
+        
+        // Draw with smooth curves using quadratic approximation
         if (points.Count >= 3)
         {
             var color = ImGui.ColorConvertFloat4ToU32(new Vector4(0.37f, 0.39f, 0.43f, 1f)); // #5f656e
             var outlineColor = ImGui.ColorConvertFloat4ToU32(new Vector4(1f, 1f, 1f, 0.82f));
             
-            var pointsArray = points.ToArray();
-            drawList.AddConvexPolyFilled(ref pointsArray[0], pointsArray.Length, color);
-            drawList.AddPolyline(ref pointsArray[0], pointsArray.Length, outlineColor, ImDrawFlags.Closed, 1.5f);
+            // Build smooth path using quadratic curve approximation
+            var smoothPoints = new List<Vector2>();
+            smoothPoints.Add(points[0]);
+            
+            for (int i = 1; i < points.Count - 1; i++) // Stop before last point (duplicate of first)
+            {
+                var nextPoint = i + 1 < points.Count ? points[i + 1] : points[0];
+                
+                // Approximate quadratic curve with intermediate points
+                var control = points[i];
+                var end = new Vector2((points[i].X + nextPoint.X) / 2f, (points[i].Y + nextPoint.Y) / 2f);
+                var start = smoothPoints[smoothPoints.Count - 1];
+                
+                // Add curve points
+                for (int j = 1; j <= 4; j++) // Start at 1 to avoid duplicating start point
+                {
+                    var t = j / 4f;
+                    var curvePoint = new Vector2(
+                        (1f - t) * (1f - t) * start.X + 2f * (1f - t) * t * control.X + t * t * end.X,
+                        (1f - t) * (1f - t) * start.Y + 2f * (1f - t) * t * control.Y + t * t * end.Y
+                    );
+                    smoothPoints.Add(curvePoint);
+                }
+            }
+            
+            if (smoothPoints.Count >= 3)
+            {
+                var pointsArray = smoothPoints.ToArray();
+                drawList.AddConvexPolyFilled(ref pointsArray[0], pointsArray.Length, color);
+                drawList.AddPolyline(ref pointsArray[0], pointsArray.Length, outlineColor, ImDrawFlags.Closed, 1.5f);
+            }
         }
     }
     

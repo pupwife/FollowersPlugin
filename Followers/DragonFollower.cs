@@ -164,7 +164,7 @@ public class DragonFollower : FollowerBase
         
         var drawList = ImGui.GetForegroundDrawList();
         
-        // Draw segments
+        // Draw segments - matching JS SVG rendering
         for (int i = 1; i < segments.Count; i++)
         {
             var prev = segments[i - 1];
@@ -179,40 +179,53 @@ public class DragonFollower : FollowerBase
             bool isFin = dragonParams.FinPositions.Contains(i);
             
             Vector4 color;
-            float size;
+            float width;
+            float height;
             
             if (isHead)
             {
                 color = dragonParams.HeadColor;
-                size = 20f * s;
+                width = 30f * s;
+                height = 25f * s;
             }
             else if (isFin)
             {
                 // Interpolate fin gradient
                 var t = (float)(i - 1) / (segments.Count - 2);
                 color = Lerp(dragonParams.FinGradientStart, dragonParams.FinGradientEnd, t);
-                size = 15f * s;
+                width = 25f * s;
+                height = 20f * s;
             }
             else
             {
                 // Interpolate spine gradient
                 var t = (float)(i - 1) / (segments.Count - 2);
                 color = Lerp(dragonParams.SpineGradientStart, dragonParams.SpineGradientEnd, t);
-                size = 8f * s;
+                width = 12f * s;
+                height = 8f * s;
             }
             
             var drawColor = ImGui.ColorConvertFloat4ToU32(color);
             
-            // Draw segment as rotated ellipse
+            // Draw segment as rotated ellipse (approximating SVG path)
             var angleDeg = a * 180f / MathF.PI;
-            DrawRotatedEllipse(drawList, center, new Vector2(size, size * 0.5f), angleDeg, drawColor);
+            DrawRotatedEllipse(drawList, center, new Vector2(width, height), angleDeg, drawColor);
+            
+            // Draw fins if this is a fin segment
+            if (isFin)
+            {
+                DrawFin(drawList, center, a, s, color);
+            }
         }
     }
     
     private void DrawRotatedEllipse(ImDrawListPtr drawList, Vector2 center, Vector2 size, float angleDeg, uint color)
     {
-        const int segments = 16;
+        const int segments = 24; // More segments for smoother ellipse
         var points = new Vector2[segments];
+        
+        var cos = MathF.Cos(angleDeg * MathF.PI / 180f);
+        var sin = MathF.Sin(angleDeg * MathF.PI / 180f);
         
         for (int i = 0; i < segments; i++)
         {
@@ -221,8 +234,6 @@ public class DragonFollower : FollowerBase
             var y = size.Y * MathF.Sin(angle);
             
             // Rotate
-            var cos = MathF.Cos(angleDeg * MathF.PI / 180f);
-            var sin = MathF.Sin(angleDeg * MathF.PI / 180f);
             var rotX = x * cos - y * sin;
             var rotY = x * sin + y * cos;
             
@@ -230,6 +241,31 @@ public class DragonFollower : FollowerBase
         }
         
         drawList.AddConvexPolyFilled(ref points[0], segments, color);
+    }
+    
+    private void DrawFin(ImDrawListPtr drawList, Vector2 center, float angle, float scale, Vector4 baseColor)
+    {
+        // Draw fin shape - simplified version of SVG fin path
+        var finSize = 15f * scale;
+        var finPoints = new Vector2[4];
+        
+        // Create fin shape pointing perpendicular to segment direction
+        finPoints[0] = center;
+        finPoints[1] = new Vector2(
+            center.X + MathF.Cos(angle + MathF.PI / 2f) * finSize,
+            center.Y + MathF.Sin(angle + MathF.PI / 2f) * finSize
+        );
+        finPoints[2] = new Vector2(
+            center.X + MathF.Cos(angle) * finSize * 0.5f,
+            center.Y + MathF.Sin(angle) * finSize * 0.5f
+        );
+        finPoints[3] = new Vector2(
+            center.X + MathF.Cos(angle - MathF.PI / 2f) * finSize,
+            center.Y + MathF.Sin(angle - MathF.PI / 2f) * finSize
+        );
+        
+        var finColor = ImGui.ColorConvertFloat4ToU32(baseColor);
+        drawList.AddQuadFilled(finPoints[0], finPoints[1], finPoints[2], finPoints[3], finColor);
     }
     
     public override void Regenerate()

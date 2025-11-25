@@ -45,27 +45,22 @@ public class ConfigWindow : Window, IDisposable
 
     public override void Draw()
     {
-        // Apply pastel theme colors
-        var style = ImGui.GetStyle();
-        var colors = style.Colors;
-        
-        // Apply pastel colors to window
-        colors[(int)ImGuiCol.WindowBg] = PastelBackground;
-        colors[(int)ImGuiCol.Text] = TextColor;
-        colors[(int)ImGuiCol.Button] = SoftPurple;
-        colors[(int)ImGuiCol.ButtonHovered] = new Vector4(SoftPurple.X * 0.9f, SoftPurple.Y * 0.9f, SoftPurple.Z * 0.9f, SoftPurple.W);
-        colors[(int)ImGuiCol.ButtonActive] = new Vector4(SoftPurple.X * 0.8f, SoftPurple.Y * 0.8f, SoftPurple.Z * 0.8f, SoftPurple.W);
-        colors[(int)ImGuiCol.FrameBg] = new Vector4(MintGreen.X, MintGreen.Y, MintGreen.Z, 0.3f);
-        colors[(int)ImGuiCol.FrameBgHovered] = new Vector4(MintGreen.X, MintGreen.Y, MintGreen.Z, 0.5f);
-        colors[(int)ImGuiCol.FrameBgActive] = new Vector4(MintGreen.X, MintGreen.Y, MintGreen.Z, 0.7f);
-        colors[(int)ImGuiCol.Header] = SoftPink;
-        colors[(int)ImGuiCol.HeaderHovered] = new Vector4(SoftPink.X * 0.9f, SoftPink.Y * 0.9f, SoftPink.Z * 0.9f, SoftPink.W);
-        colors[(int)ImGuiCol.HeaderActive] = new Vector4(SoftPink.X * 0.8f, SoftPink.Y * 0.8f, SoftPink.Z * 0.8f, SoftPink.W);
-        colors[(int)ImGuiCol.CheckMark] = SoftPink;
-        
+        // Apply pastel theme colors ONLY to this window using PushStyleColor
+        // This ensures the theme doesn't affect other Dalamud plugins
+        ImGui.PushStyleColor(ImGuiCol.WindowBg, PastelBackground);
         ImGui.PushStyleColor(ImGuiCol.Text, TextColor);
+        ImGui.PushStyleColor(ImGuiCol.Button, SoftPurple);
+        ImGui.PushStyleColor(ImGuiCol.ButtonHovered, new Vector4(SoftPurple.X * 0.9f, SoftPurple.Y * 0.9f, SoftPurple.Z * 0.9f, SoftPurple.W));
+        ImGui.PushStyleColor(ImGuiCol.ButtonActive, new Vector4(SoftPurple.X * 0.8f, SoftPurple.Y * 0.8f, SoftPurple.Z * 0.8f, SoftPurple.W));
+        ImGui.PushStyleColor(ImGuiCol.FrameBg, new Vector4(MintGreen.X, MintGreen.Y, MintGreen.Z, 0.3f));
+        ImGui.PushStyleColor(ImGuiCol.FrameBgHovered, new Vector4(MintGreen.X, MintGreen.Y, MintGreen.Z, 0.5f));
+        ImGui.PushStyleColor(ImGuiCol.FrameBgActive, new Vector4(MintGreen.X, MintGreen.Y, MintGreen.Z, 0.7f));
+        ImGui.PushStyleColor(ImGuiCol.Header, SoftPink);
+        ImGui.PushStyleColor(ImGuiCol.HeaderHovered, new Vector4(SoftPink.X * 0.9f, SoftPink.Y * 0.9f, SoftPink.Z * 0.9f, SoftPink.W));
+        ImGui.PushStyleColor(ImGuiCol.HeaderActive, new Vector4(SoftPink.X * 0.8f, SoftPink.Y * 0.8f, SoftPink.Z * 0.8f, SoftPink.W));
+        ImGui.PushStyleColor(ImGuiCol.CheckMark, SoftPink);
+        
         ImGui.Text("Followers Plugin Configuration");
-        ImGui.PopStyleColor();
         
         // Pastel separator
         ImGui.PushStyleColor(ImGuiCol.Separator, LightOrange);
@@ -123,9 +118,10 @@ public class ConfigWindow : Window, IDisposable
         ImGui.Separator();
         ImGui.PopStyleColor();
         
-        ImGui.PushStyleColor(ImGuiCol.Text, new Vector4(TextColor.X, TextColor.Y, TextColor.Z, 0.8f));
         ImGui.TextWrapped("Use /pfollowers to open this window.");
         ImGui.TextWrapped("Use /pfollowers regen to regenerate the current follower.");
-        ImGui.PopStyleColor();
+        
+        // Pop all style colors to restore default theme for other windows
+        ImGui.PopStyleColor(12); // Pop all the colors we pushed
     }
 }
