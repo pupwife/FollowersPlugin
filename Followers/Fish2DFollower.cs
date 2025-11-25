@@ -160,38 +160,38 @@ public class Fish2DFollower : FollowerBase
         );
         points.Add(silhouettePoint);
         
-        // Forward pass
+        // Forward pass - matching JS logic exactly
         for (int i = 0; i < chain.Count; i++)
         {
-            var current = chain[i];
             var haveNext = i + 1 < chain.Count;
-            var reference = haveNext ? chain[i + 1] : (i > 0 ? chain[i - 1] : current);
+            var referenceDot = haveNext ? chain[i + 1] : (i > 0 ? chain[i - 1] : chain[i]);
+            var currentDot = chain[i];
             
-            dx = reference.Position.X - current.Position.X;
-            dy = reference.Position.Y - current.Position.Y;
+            dx = referenceDot.Position.X - currentDot.Position.X;
+            dy = referenceDot.Position.Y - currentDot.Position.Y;
             angle = MathF.Atan2(dy, dx) + (haveNext ? MathF.PI / 2f : -MathF.PI / 2f);
             
             silhouettePoint = new Vector2(
-                current.Position.X + current.Size * MathF.Cos(angle),
-                current.Position.Y + current.Size * MathF.Sin(angle)
+                currentDot.Position.X + currentDot.Size * MathF.Cos(angle),
+                currentDot.Position.Y + currentDot.Size * MathF.Sin(angle)
             );
             points.Add(silhouettePoint);
         }
         
-        // Backward pass
+        // Backward pass - matching JS logic exactly
         for (int i = chain.Count - 1; i >= 0; i--)
         {
-            var current = chain[i];
             var haveNext = i > 0;
-            var reference = haveNext ? chain[i - 1] : (i + 1 < chain.Count ? chain[i + 1] : current);
+            var referenceDot = haveNext ? chain[i - 1] : (i + 1 < chain.Count ? chain[i + 1] : chain[i]);
+            var currentDot = chain[i];
             
-            dx = reference.Position.X - current.Position.X;
-            dy = reference.Position.Y - current.Position.Y;
+            dx = referenceDot.Position.X - currentDot.Position.X;
+            dy = referenceDot.Position.Y - currentDot.Position.Y;
             angle = MathF.Atan2(dy, dx) + (haveNext ? MathF.PI / 2f : -MathF.PI / 2f);
             
             silhouettePoint = new Vector2(
-                current.Position.X + current.Size * MathF.Cos(angle),
-                current.Position.Y + current.Size * MathF.Sin(angle)
+                currentDot.Position.X + currentDot.Size * MathF.Cos(angle),
+                currentDot.Position.Y + currentDot.Size * MathF.Sin(angle)
             );
             points.Add(silhouettePoint);
         }
@@ -288,12 +288,14 @@ public class Fish2DFollower : FollowerBase
         if (segmentIndex >= chain.Count || segmentIndex < 2) return;
         
         var segment = chain[segmentIndex];
-        var lastSegment = segmentIndex >= 2 ? chain[segmentIndex - 2] : chain[0];
+        var lastSegment = chain[segmentIndex - 2];
         
+        // Calculate angle from lastSegment to segment (direction of body)
         var dx = segment.Position.X - lastSegment.Position.X;
         var dy = segment.Position.Y - lastSegment.Position.Y;
         var angle = MathF.Atan2(dy, dx);
         
+        // Fins extend perpendicular to body direction (on the sides)
         var finSize = size * 3.5f;
         var fin1 = new Vector2(
             segment.Position.X + MathF.Cos(angle + MathF.PI / 2f) * finSize,
@@ -304,16 +306,62 @@ public class Fish2DFollower : FollowerBase
             segment.Position.Y + MathF.Sin(angle - MathF.PI / 2f) * finSize
         );
         
-        var points = new Vector2[]
-        {
-            segment.Position,
-            fin1,
-            lastSegment.Position,
-            fin2
-        };
-        
+        // Draw fin using quadratic curve approximation (matching JS)
         var color = ImGui.ColorConvertFloat4ToU32(new Vector4(1f, 1f, 1f, 0.82f));
-        drawList.AddQuadFilled(points[0], points[1], points[2], points[3], color);
+        
+        // Create smooth fin shape with quadratic curves
+        var finPoints = new List<Vector2>();
+        finPoints.Add(segment.Position);
+        
+        // Curve to fin1
+        for (int i = 0; i <= 4; i++)
+        {
+            var t = i / 4f;
+            var midX = (segment.Position.X + fin1.X) / 2f;
+            var midY = (segment.Position.Y + fin1.Y) / 2f;
+            var x = (1f - t) * (1f - t) * segment.Position.X + 2f * (1f - t) * t * midX + t * t * fin1.X;
+            var y = (1f - t) * (1f - t) * segment.Position.Y + 2f * (1f - t) * t * midY + t * t * fin1.Y;
+            finPoints.Add(new Vector2(x, y));
+        }
+        
+        // Curve to lastSegment
+        for (int i = 1; i <= 4; i++)
+        {
+            var t = i / 4f;
+            var midX = (fin1.X + lastSegment.Position.X) / 2f;
+            var midY = (fin1.Y + lastSegment.Position.Y) / 2f;
+            var x = (1f - t) * (1f - t) * fin1.X + 2f * (1f - t) * t * midX + t * t * lastSegment.Position.X;
+            var y = (1f - t) * (1f - t) * fin1.Y + 2f * (1f - t) * t * midY + t * t * lastSegment.Position.Y;
+            finPoints.Add(new Vector2(x, y));
+        }
+        
+        // Curve to fin2
+        for (int i = 1; i <= 4; i++)
+        {
+            var t = i / 4f;
+            var midX = (lastSegment.Position.X + fin2.X) / 2f;
+            var midY = (lastSegment.Position.Y + fin2.Y) / 2f;
+            var x = (1f - t) * (1f - t) * lastSegment.Position.X + 2f * (1f - t) * t * midX + t * t * fin2.X;
+            var y = (1f - t) * (1f - t) * lastSegment.Position.Y + 2f * (1f - t) * t * midY + t * t * fin2.Y;
+            finPoints.Add(new Vector2(x, y));
+        }
+        
+        // Curve back to segment
+        for (int i = 1; i <= 4; i++)
+        {
+            var t = i / 4f;
+            var midX = (fin2.X + segment.Position.X) / 2f;
+            var midY = (fin2.Y + segment.Position.Y) / 2f;
+            var x = (1f - t) * (1f - t) * fin2.X + 2f * (1f - t) * t * midX + t * t * segment.Position.X;
+            var y = (1f - t) * (1f - t) * fin2.Y + 2f * (1f - t) * t * midY + t * t * segment.Position.Y;
+            finPoints.Add(new Vector2(x, y));
+        }
+        
+        if (finPoints.Count >= 3)
+        {
+            var pointsArray = finPoints.ToArray();
+            drawList.AddConvexPolyFilled(ref pointsArray[0], pointsArray.Length, color);
+        }
     }
     
     private void DrawEyes(ImDrawListPtr drawList)

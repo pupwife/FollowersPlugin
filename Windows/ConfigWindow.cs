@@ -43,7 +43,7 @@ public class ConfigWindow : Window, IDisposable
 
     public void Dispose() { }
 
-    public override void Draw()
+    public override void PreDraw()
     {
         // Apply pastel theme colors ONLY to this window using PushStyleColor
         // This ensures the theme doesn't affect other Dalamud plugins
@@ -59,7 +59,10 @@ public class ConfigWindow : Window, IDisposable
         ImGui.PushStyleColor(ImGuiCol.HeaderHovered, new Vector4(SoftPink.X * 0.9f, SoftPink.Y * 0.9f, SoftPink.Z * 0.9f, SoftPink.W));
         ImGui.PushStyleColor(ImGuiCol.HeaderActive, new Vector4(SoftPink.X * 0.8f, SoftPink.Y * 0.8f, SoftPink.Z * 0.8f, SoftPink.W));
         ImGui.PushStyleColor(ImGuiCol.CheckMark, SoftPink);
-        
+    }
+    
+    public override void Draw()
+    {
         ImGui.Text("Followers Plugin Configuration");
         
         // Pastel separator
@@ -120,7 +123,10 @@ public class ConfigWindow : Window, IDisposable
         
         ImGui.TextWrapped("Use /pfollowers to open this window.");
         ImGui.TextWrapped("Use /pfollowers regen to regenerate the current follower.");
-        
+    }
+    
+    public override void PostDraw()
+    {
         // Pop all style colors to restore default theme for other windows
         ImGui.PopStyleColor(12); // Pop all the colors we pushed
     }

@@ -143,18 +143,19 @@ public class DragonFollower : FollowerBase
             segments[i] = current;
         }
         
-        // Update animation
-        if (rad < MathF.Min(cursorPos.X, cursorPos.Y) - 20f)
+        // Update animation - matching JS logic
+        var radm = MathF.Min(cursorPos.X, cursorPos.Y) - 20f;
+        if (rad < radm)
         {
             rad++;
         }
         frm += dragonParams.AnimationSpeed;
         
-        // Return to center if idle
+        // Return to center if idle (rad > 60)
         if (rad > 60f)
         {
-            cursorPosition.X += (width / 2f - cursorPosition.X) * 0.05f;
-            cursorPosition.Y += (height / 2f - cursorPosition.Y) * 0.05f;
+            cursorPos.X += (width / 2f - cursorPos.X) * 0.05f;
+            cursorPos.Y += (height / 2f - cursorPos.Y) * 0.05f;
         }
     }
     
