@@ -12,6 +12,14 @@ public class ConfigWindow : Window, IDisposable
     private readonly Plugin plugin;
     private readonly Configuration configuration;
     private int selectedFollowerIndex = 0;
+    
+    // Pastel color theme
+    private static readonly Vector4 MintGreen = new(0.66f, 0.90f, 0.81f, 1.0f);      // #A8E6CF
+    private static readonly Vector4 SoftPink = new(1.0f, 0.70f, 0.73f, 1.0f);        // #FFB3BA
+    private static readonly Vector4 SoftPurple = new(0.78f, 0.81f, 0.92f, 1.0f);    // #C7CEEA
+    private static readonly Vector4 LightOrange = new(1.0f, 0.83f, 0.65f, 1.0f);     // #FFD3A5
+    private static readonly Vector4 PastelBackground = new(0.98f, 0.96f, 0.99f, 1.0f); // Very light pastel
+    private static readonly Vector4 TextColor = new(0.3f, 0.3f, 0.35f, 1.0f);        // Soft dark gray
 
     public ConfigWindow(Plugin plugin) : base("Followers Configuration###FollowersConfig")
     {
@@ -37,8 +45,32 @@ public class ConfigWindow : Window, IDisposable
 
     public override void Draw()
     {
+        // Apply pastel theme colors
+        var style = ImGui.GetStyle();
+        var colors = style.Colors;
+        
+        // Apply pastel colors to window
+        colors[(int)ImGuiCol.WindowBg] = PastelBackground;
+        colors[(int)ImGuiCol.Text] = TextColor;
+        colors[(int)ImGuiCol.Button] = SoftPurple;
+        colors[(int)ImGuiCol.ButtonHovered] = new Vector4(SoftPurple.X * 0.9f, SoftPurple.Y * 0.9f, SoftPurple.Z * 0.9f, SoftPurple.W);
+        colors[(int)ImGuiCol.ButtonActive] = new Vector4(SoftPurple.X * 0.8f, SoftPurple.Y * 0.8f, SoftPurple.Z * 0.8f, SoftPurple.W);
+        colors[(int)ImGuiCol.FrameBg] = new Vector4(MintGreen.X, MintGreen.Y, MintGreen.Z, 0.3f);
+        colors[(int)ImGuiCol.FrameBgHovered] = new Vector4(MintGreen.X, MintGreen.Y, MintGreen.Z, 0.5f);
+        colors[(int)ImGuiCol.FrameBgActive] = new Vector4(MintGreen.X, MintGreen.Y, MintGreen.Z, 0.7f);
+        colors[(int)ImGuiCol.Header] = SoftPink;
+        colors[(int)ImGuiCol.HeaderHovered] = new Vector4(SoftPink.X * 0.9f, SoftPink.Y * 0.9f, SoftPink.Z * 0.9f, SoftPink.W);
+        colors[(int)ImGuiCol.HeaderActive] = new Vector4(SoftPink.X * 0.8f, SoftPink.Y * 0.8f, SoftPink.Z * 0.8f, SoftPink.W);
+        colors[(int)ImGuiCol.CheckMark] = SoftPink;
+        
+        ImGui.PushStyleColor(ImGuiCol.Text, TextColor);
         ImGui.Text("Followers Plugin Configuration");
+        ImGui.PopStyleColor();
+        
+        // Pastel separator
+        ImGui.PushStyleColor(ImGuiCol.Separator, LightOrange);
         ImGui.Separator();
+        ImGui.PopStyleColor();
         ImGui.Spacing();
 
         // Enable/Disable toggle
@@ -73,18 +105,27 @@ public class ConfigWindow : Window, IDisposable
             // Regenerate button (only show if current follower can regenerate)
             if (plugin.FollowerManager.CanRegenerateCurrentFollower())
             {
+                ImGui.PushStyleColor(ImGuiCol.Button, LightOrange);
+                ImGui.PushStyleColor(ImGuiCol.ButtonHovered, new Vector4(LightOrange.X * 0.9f, LightOrange.Y * 0.9f, LightOrange.Z * 0.9f, LightOrange.W));
+                ImGui.PushStyleColor(ImGuiCol.ButtonActive, new Vector4(LightOrange.X * 0.8f, LightOrange.Y * 0.8f, LightOrange.Z * 0.8f, LightOrange.W));
                 if (ImGui.Button("Regenerate Follower"))
                 {
                     plugin.FollowerManager.RegenerateCurrentFollower();
                 }
+                ImGui.PopStyleColor(3);
                 ImGui.SameLine();
                 ImGui.TextDisabled("(Procedural)");
             }
         }
 
         ImGui.Spacing();
+        ImGui.PushStyleColor(ImGuiCol.Separator, LightOrange);
         ImGui.Separator();
+        ImGui.PopStyleColor();
+        
+        ImGui.PushStyleColor(ImGuiCol.Text, new Vector4(TextColor.X, TextColor.Y, TextColor.Z, 0.8f));
         ImGui.TextWrapped("Use /pfollowers to open this window.");
         ImGui.TextWrapped("Use /pfollowers regen to regenerate the current follower.");
+        ImGui.PopStyleColor();
     }
 }

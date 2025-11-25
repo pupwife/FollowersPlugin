@@ -1,20 +1,26 @@
-{
-  "Author": "pupwife",
-  "Name": "Followers",
-  "Punchline": "Cute followers that follow your cursor around the screen.",
-  "Description": "A plugin that adds followers that follow your cursor around the entire screen, not limited to Dalamud windows. Includes Fish2D, Dragon, and Skeletile followers.",
-  "InternalName": "FollowersPlugin",
-  "AssemblyVersion": "0.0.0.1",
-  "RepoUrl": "https://github.com/pupwife/FollowersPlugin",
-  "ApplicableVersion": "any",
-  "Tags": [
-    "followers",
-    "cursor",
-    "fun"
-  ],
-  "DalamudApiLevel": 13,
-  "LoadPriority": 0,
-  "IconUrl": "",
-  "ImageUrls": []
-}
+[
+  {
+    "Author": "pupwife",
+    "Name": "Followers",
+    "Punchline": "Cute followers that follow your cursor around the screen.",
+    "Description": "A plugin that adds followers that follow your cursor around the entire screen, not limited to Dalamud windows. Includes Fish2D, Dragon, and Skeletile followers.",
+    "InternalName": "FollowersPlugin",
+    "AssemblyVersion": "0.0.0.1",
+    "RepoUrl": "https://github.com/pupwife/FollowersPlugin",
+    "ApplicableVersion": "any",
+    "Tags": [
+      "followers",
+      "cursor",
+      "fun"
+    ],
+    "DalamudApiLevel": 13,
+    "LoadPriority": 0,
+    "IconUrl": "",
+    "ImageUrls": [],
+    "DownloadLinkInstall": "https://github.com/pupwife/FollowersPlugin/releases/latest/download/Followers.zip",
+    "DownloadLinkUpdate": "https://github.com/pupwife/FollowersPlugin/releases/latest/download/Followers.zip",
+    "DownloadLinkTesting": "https://github.com/pupwife/FollowersPlugin/releases/latest/download/Followers.zip",
+    "LastUpdate": 1732560000
+  }
+]
 
