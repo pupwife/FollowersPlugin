@@ -3,7 +3,7 @@
   "Name": "Followers",
   "Punchline": "Cute followers that follow your cursor around the screen.",
   "Description": "A plugin that adds followers that follow your cursor around the entire screen, not limited to Dalamud windows.",
-  "AssemblyVersion": "0.2.2.0",
+  "AssemblyVersion": "3.0.0.0",
   "ApplicableVersion": "any",
   "Tags": [
     "followers",
