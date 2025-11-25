@@ -202,13 +202,13 @@ public class Fish2DFollower : FollowerBase
             points.Add(points[0]);
         }
         
-        // Draw with smooth curves using quadratic approximation
+        // Draw with smooth curves using quadratic approximation (matching JS exactly)
         if (points.Count >= 3)
         {
             var color = ImGui.ColorConvertFloat4ToU32(new Vector4(0.37f, 0.39f, 0.43f, 1f)); // #5f656e
             var outlineColor = ImGui.ColorConvertFloat4ToU32(new Vector4(1f, 1f, 1f, 0.82f));
             
-            // Build smooth path using quadratic curve approximation
+            // Build smooth path using quadratic curve approximation (matching JS quadraticCurveTo)
             var smoothPoints = new List<Vector2>();
             smoothPoints.Add(points[0]);
             
@@ -216,21 +216,27 @@ public class Fish2DFollower : FollowerBase
             {
                 var nextPoint = i + 1 < points.Count ? points[i + 1] : points[0];
                 
-                // Approximate quadratic curve with intermediate points
+                // Match JS: quadraticCurveTo(control, end) where end is midpoint
                 var control = points[i];
                 var end = new Vector2((points[i].X + nextPoint.X) / 2f, (points[i].Y + nextPoint.Y) / 2f);
                 var start = smoothPoints[smoothPoints.Count - 1];
                 
-                // Add curve points
-                for (int j = 1; j <= 4; j++) // Start at 1 to avoid duplicating start point
+                // Add curve points (more points for smoother curve)
+                for (int j = 1; j <= 8; j++) // More segments for smoother curves
                 {
-                    var t = j / 4f;
+                    var t = j / 8f;
                     var curvePoint = new Vector2(
                         (1f - t) * (1f - t) * start.X + 2f * (1f - t) * t * control.X + t * t * end.X,
                         (1f - t) * (1f - t) * start.Y + 2f * (1f - t) * t * control.Y + t * t * end.Y
                     );
                     smoothPoints.Add(curvePoint);
                 }
+            }
+            
+            // Ensure the shape is closed properly
+            if (smoothPoints.Count > 0 && Vector2.Distance(smoothPoints[0], smoothPoints[smoothPoints.Count - 1]) > 1f)
+            {
+                smoothPoints.Add(smoothPoints[0]);
             }
             
             if (smoothPoints.Count >= 3)

@@ -497,11 +497,11 @@ public class SkeletileFollower : FollowerBase
     {
         if (segment.Parent != null)
         {
-            drawList.AddLine(segment.Parent.Position, segment.Position, color, 2f);
+            drawList.AddLine(segment.Parent.Position, segment.Position, color, 1f);
         }
         
         // Draw joint - matching JS: partial arc (3/4 circle) + triangle
-        var r = 4f;
+        var r = 2f;
         var absAngle = segment.Parent != null 
             ? MathF.Atan2(segment.Position.Y - segment.Parent.Position.Y, segment.Position.X - segment.Parent.Position.X)
             : segment.AbsAngle;
@@ -526,7 +526,7 @@ public class SkeletileFollower : FollowerBase
         // Draw arc outline
         for (int i = 0; i < arcPoints.Count - 1; i++)
         {
-            drawList.AddLine(arcPoints[i], arcPoints[i + 1], color, 2f);
+            drawList.AddLine(arcPoints[i], arcPoints[i + 1], color, 1f);
         }
         
         // Draw triangle pointing in direction of movement
@@ -543,8 +543,8 @@ public class SkeletileFollower : FollowerBase
             segment.Position.Y + r * MathF.Sin(MathF.PI / 4f + absAngle)
         );
         
-        drawList.AddLine(endPoint, centerPoint, color, 2f);
-        drawList.AddLine(centerPoint, startPoint, color, 2f);
+        drawList.AddLine(endPoint, centerPoint, color, 1f);
+        drawList.AddLine(centerPoint, startPoint, color, 1f);
         
         foreach (var child in segment.Children)
         {

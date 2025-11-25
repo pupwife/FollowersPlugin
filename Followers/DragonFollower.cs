@@ -32,6 +32,10 @@ public class DragonFollower : FollowerBase
     private float rad = 0f;
     private float frm;
     private Random random = null!;
+    private Vector2 lastCursorPos = Vector2.Zero;
+    private float timeSinceMouseMove = 0f;
+    private const float IDLE_DELAY = 2.5f; // Seconds before going back to idle
+    private bool isFollowingMouse = false;
     
     public override void Initialize()
     {
@@ -121,13 +125,34 @@ public class DragonFollower : FollowerBase
         var width = viewport.Size.X;
         var height = viewport.Size.Y;
         
-        // Update first segment (head) to follow cursor with smooth interpolation
+        // Check if mouse moved
+        var mouseMoved = Vector2.Distance(cursorPos, lastCursorPos) > 1f;
+        if (mouseMoved)
+        {
+            isFollowingMouse = true;
+            timeSinceMouseMove = 0f;
+            rad = 0f; // Reset idle animation when mouse moves (matching JS)
+        }
+        else
+        {
+            timeSinceMouseMove += deltaTime;
+            // After delay, go back to idle
+            if (timeSinceMouseMove > IDLE_DELAY)
+            {
+                isFollowingMouse = false;
+            }
+        }
+        lastCursorPos = cursorPos;
+        
+        // Update first segment (head) to follow cursor
         var head = segments[0];
         var ax = MathF.Cos(3f * frm) * rad * width / height;
         var ay = MathF.Sin(4f * frm) * rad * height / width;
         
-        head.X += (ax + cursorPos.X - head.X) / 10f;
-        head.Y += (ay + cursorPos.Y - head.Y) / 10f;
+        // Fast interpolation when following mouse, slower when idle
+        var interpolationSpeed = isFollowingMouse ? 3f : 10f;
+        head.X += (ax + cursorPos.X - head.X) / interpolationSpeed;
+        head.Y += (ay + cursorPos.Y - head.Y) / interpolationSpeed;
         segments[0] = head;
         
         // Update other segments
@@ -145,14 +170,14 @@ public class DragonFollower : FollowerBase
         
         // Update animation - matching JS logic
         var radm = MathF.Min(cursorPos.X, cursorPos.Y) - 20f;
-        if (rad < radm)
+        if (rad < radm && !isFollowingMouse)
         {
             rad++;
         }
         frm += dragonParams.AnimationSpeed;
         
         // Return to center if idle (rad > 60)
-        if (rad > 60f)
+        if (rad > 60f && !isFollowingMouse)
         {
             cursorPos.X += (width / 2f - cursorPos.X) * 0.05f;
             cursorPos.Y += (height / 2f - cursorPos.Y) * 0.05f;
@@ -165,7 +190,21 @@ public class DragonFollower : FollowerBase
         
         var drawList = ImGui.GetForegroundDrawList();
         
-        // Draw segments - matching JS SVG rendering
+        // Draw segments as connected body (matching JS SVG rendering)
+        // Draw connecting lines between segments first for continuous body
+        for (int i = 1; i < segments.Count; i++)
+        {
+            var prev = segments[i - 1];
+            var current = segments[i];
+            
+            // Draw connecting line between segments
+            var spineColor = Lerp(dragonParams.SpineGradientStart, dragonParams.SpineGradientEnd, (float)(i - 1) / (segments.Count - 2));
+            var lineColor = ImGui.ColorConvertFloat4ToU32(spineColor);
+            var lineWidth = ((162f + 4f * (1f - i)) / 50f) * dragonParams.Scale * 8f;
+            drawList.AddLine(prev, current, lineColor, lineWidth);
+        }
+        
+        // Draw segments on top
         for (int i = 1; i < segments.Count; i++)
         {
             var prev = segments[i - 1];
