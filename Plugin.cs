@@ -4,9 +4,10 @@ using Dalamud.Plugin;
 using System.IO;
 using Dalamud.Interface.Windowing;
 using Dalamud.Plugin.Services;
-using SamplePlugin.Windows;
+using FollowersPlugin.Windows;
+using FollowersPlugin.Followers;
 
-namespace SamplePlugin;
+namespace FollowersPlugin;
 
 public sealed class Plugin : IDalamudPlugin
 {
@@ -17,69 +18,81 @@ public sealed class Plugin : IDalamudPlugin
     [PluginService] internal static IDataManager DataManager { get; private set; } = null!;
     [PluginService] internal static IPluginLog Log { get; private set; } = null!;
 
-    private const string CommandName = "/pmycommand";
+    private const string CommandName = "/pfollowers";
 
     public Configuration Configuration { get; init; }
+    public FollowerManager FollowerManager { get; init; }
 
-    public readonly WindowSystem WindowSystem = new("SamplePlugin");
+    public readonly WindowSystem WindowSystem = new("FollowersPlugin");
     private ConfigWindow ConfigWindow { get; init; }
-    private MainWindow MainWindow { get; init; }
 
     public Plugin()
     {
         Configuration = PluginInterface.GetPluginConfig() as Configuration ?? new Configuration();
-
-        // You might normally want to embed resources and load them from the manifest stream
-        var goatImagePath = Path.Combine(PluginInterface.AssemblyLocation.Directory?.FullName!, "goat.png");
+        FollowerManager = new FollowerManager();
 
         ConfigWindow = new ConfigWindow(this);
-        MainWindow = new MainWindow(this, goatImagePath);
-
         WindowSystem.AddWindow(ConfigWindow);
-        WindowSystem.AddWindow(MainWindow);
 
         CommandManager.AddHandler(CommandName, new CommandInfo(OnCommand)
         {
-            HelpMessage = "A useful message to display in /xlhelp"
+            HelpMessage = "Open the followers configuration window. Use '/pfollowers regen' to regenerate the current follower."
         });
 
-        // Tell the UI system that we want our windows to be drawn throught he window system
-        PluginInterface.UiBuilder.Draw += WindowSystem.Draw;
+        // Tell the UI system that we want our windows to be drawn through the window system
+        PluginInterface.UiBuilder.Draw += Draw;
 
         // This adds a button to the plugin installer entry of this plugin which allows
         // toggling the display status of the configuration ui
         PluginInterface.UiBuilder.OpenConfigUi += ToggleConfigUi;
 
-        // Adds another button doing the same but for the main ui of the plugin
-        PluginInterface.UiBuilder.OpenMainUi += ToggleMainUi;
+        // Initialize follower from config
+        if (Configuration.IsEnabled && !string.IsNullOrEmpty(Configuration.SelectedFollower))
+        {
+            FollowerManager.SetEnabled(true);
+            FollowerManager.SwitchFollower(Configuration.SelectedFollower);
+        }
 
-        // Add a simple message to the log with level set to information
-        // Use /xllog to open the log window in-game
-        // Example Output: 00:57:54.959 | INF | [SamplePlugin] ===A cool log message from Sample Plugin===
-        Log.Information($"===A cool log message from {PluginInterface.Manifest.Name}===");
+        Log.Information($"===Followers Plugin initialized: {PluginInterface.Manifest.Name}===");
+    }
+
+    private void Draw()
+    {
+        WindowSystem.Draw();
+        
+        // Update and draw followers (on top of everything)
+        FollowerManager.Update();
+        FollowerManager.Draw();
     }
 
     public void Dispose()
     {
-        // Unregister all actions to not leak anythign during disposal of plugin
-        PluginInterface.UiBuilder.Draw -= WindowSystem.Draw;
+        // Unregister all actions to not leak anything during disposal of plugin
+        PluginInterface.UiBuilder.Draw -= Draw;
         PluginInterface.UiBuilder.OpenConfigUi -= ToggleConfigUi;
-        PluginInterface.UiBuilder.OpenMainUi -= ToggleMainUi;
         
         WindowSystem.RemoveAllWindows();
-
         ConfigWindow.Dispose();
-        MainWindow.Dispose();
+        FollowerManager.Dispose();
 
         CommandManager.RemoveHandler(CommandName);
     }
 
     private void OnCommand(string command, string args)
     {
-        // In response to the slash command, toggle the display status of our main ui
-        MainWindow.Toggle();
+        args = args.Trim().ToLowerInvariant();
+        
+        if (args == "regen")
+        {
+            FollowerManager.RegenerateCurrentFollower();
+            Log.Information("Regenerated current follower");
+        }
+        else
+        {
+            // Open config window
+            ToggleConfigUi();
+        }
     }
     
     public void ToggleConfigUi() => ConfigWindow.Toggle();
-    public void ToggleMainUi() => MainWindow.Toggle();
 }
