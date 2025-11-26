@@ -6,8 +6,8 @@ A Dalamud plugin that adds cute animated followers that follow your cursor aroun
 
 * **Three Unique Followers:**
   * **Fish2D** - A smooth 2D fish with chain-based body animation, fins, and eyes
-  * **Dragon** - A procedurally generated SVG-style dragon with segments, fins, and color gradients
-  * **Skeletile** - A procedurally generated skeleton creature with segments and legs
+  * **Dragon** - A procedurally generated SVG-style dragon with segments, fins, and color gradients. Dashes to the cursor when it moves, then returns to idle behavior after a delay.
+  * **Skeletile** - A procedurally generated skeleton creature with advanced hunting and stalking behaviors, inverse kinematics for leg movement, and personality-based AI
 
 * **Procedural Generation** - Dragon and Skeletile followers can be regenerated with new random parameters (colors, sizes, segment counts, etc.)
 
@@ -25,6 +25,20 @@ A Dalamud plugin that adds cute animated followers that follow your cursor aroun
 ## Installation
 
 ### For Users
+
+#### Option 1: Custom Repository (Recommended)
+
+1. Launch the game and use `/xlplugins` to open the Plugin Installer
+2. Go to **Settings** → **Custom Plugin Repositories**
+3. Click **Add** and enter the following URL:
+   ```
+   https://raw.githubusercontent.com/pupwife/FollowersPlugin/master/repo.json
+   ```
+4. Click **Save** and return to the **Available Plugins** tab
+5. Find "Followers" in the list and click **Install**
+6. Use `/pfollowers` to open the configuration window and select your follower!
+
+#### Option 2: Manual Installation
 
 1. Download the latest release from the [Releases](https://github.com/pupwife/FollowersPlugin/releases) page
 2. Extract `Followers.zip` to your Dalamud dev plugins directory (usually `%AppData%\XIVLauncher\addon\Hooks\dev\Plugins\`)
@@ -63,6 +77,41 @@ The configuration window allows you to:
 * Enable/Disable followers
 * Switch between different follower types
 * Regenerate procedurally generated followers (Dragon and Skeletile)
+
+Your selected follower preference is saved and will be restored when you re-enable followers.
+
+## Skeletile Behavior
+
+Skeletile is a procedurally generated skeleton creature with advanced AI behaviors:
+
+### Personality System
+* **Brute (≤4 legs)** - Direct, aggressive approach. Charges at the cursor when idle.
+* **Sneaky (≥8 legs)** - Patient, indirect approach. Uses cunning tactics and tries to hide.
+* **Balanced (5-7 legs)** - Mix of both behaviors.
+
+### Hunting & Stalking
+* **Stalking Behavior** - Skeletile follows behind the cursor at a distance, creating a stalking effect
+* **Idle Detection** - Tracks cursor movement history to detect when the cursor is idle
+* **Aggression System** - Builds aggression over time if it can't catch the cursor, making it more restless
+
+### Pounce States
+When the cursor is idle for 2.5+ seconds, Skeletile enters a pounce sequence:
+1. **Approaching** - Moves towards the cursor
+2. **Attacking** (Brute) - Direct charge to get on top of the cursor
+3. **Wrapping** (Sneaky/Anaconda) - Circles around the cursor in an ouroboros pattern
+4. **Coiling** - When close enough, coils around the cursor in a tight circle
+
+### Inverse Kinematics
+* Legs use IK to walk naturally, with stepping behavior
+* Leg count scales with tail length (even number, half on each side)
+* More legs = faster movement and more complex behavior
+
+### Procedural Generation
+Each Skeletile is unique with:
+* Random leg count (2-12 legs, even numbers)
+* Random tail length (scales with leg count)
+* Random size variation
+* Speed multipliers based on leg count
 
 ## Technical Details
 
