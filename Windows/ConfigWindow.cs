@@ -76,7 +76,8 @@ public class ConfigWindow : Window, IDisposable
         if (ImGui.Checkbox("Enable Followers", ref isEnabled))
         {
             configuration.IsEnabled = isEnabled;
-            plugin.FollowerManager.SetEnabled(isEnabled);
+            // When enabling, pass the selected follower from config to restore it
+            plugin.FollowerManager.SetEnabled(isEnabled, configuration.SelectedFollower);
             configuration.Save();
         }
 

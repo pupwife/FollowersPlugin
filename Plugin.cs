@@ -49,8 +49,7 @@ public sealed class Plugin : IDalamudPlugin
         // Initialize follower from config
         if (Configuration.IsEnabled && !string.IsNullOrEmpty(Configuration.SelectedFollower))
         {
-            FollowerManager.SetEnabled(true);
-            FollowerManager.SwitchFollower(Configuration.SelectedFollower);
+            FollowerManager.SetEnabled(true, Configuration.SelectedFollower);
         }
 
         Log.Information($"===Followers Plugin initialized: {PluginInterface.Manifest.Name}===");

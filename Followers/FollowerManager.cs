@@ -40,17 +40,32 @@ public class FollowerManager : IDisposable
     
     public bool IsEnabled => isEnabled;
     
-    public void SetEnabled(bool enabled)
+    public void SetEnabled(bool enabled, string? preferredFollowerName = null)
     {
         isEnabled = enabled;
         if (!enabled)
         {
-            SwitchFollower(null);
+            // When disabling, preserve the current follower name so we can restore it later
+            // Don't clear currentFollowerName - just cleanup the follower instance
+            if (currentFollower != null)
+            {
+                currentFollower.Cleanup();
+                currentFollower = null;
+            }
         }
-        else if (currentFollowerName == null && followers.Count > 0)
+        else
         {
-            // Default to first follower
-            SwitchFollower(followers.Keys.First());
+            // When enabling, restore the preferred follower or current follower name
+            var followerToRestore = preferredFollowerName ?? currentFollowerName;
+            if (followerToRestore != null && followers.ContainsKey(followerToRestore))
+            {
+                SwitchFollower(followerToRestore);
+            }
+            else if (currentFollowerName == null && followers.Count > 0)
+            {
+                // Default to first follower only if no preference and no current follower
+                SwitchFollower(followers.Keys.First());
+            }
         }
     }
     
