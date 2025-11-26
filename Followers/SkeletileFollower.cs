@@ -889,11 +889,11 @@ public class SkeletileFollower : FollowerBase
     private void DrawSegment(ImDrawListPtr drawList, Segment segment, uint color)
     {
         // Draw line from parent to this segment (matching JS draw method exactly)
-        // JS: ctx.lineWidth = 2, but for skeleton appearance we want thinner lines
-        // Using 0.75f for delicate skeleton appearance
+        // JS: ctx.lineWidth = 2, but canvas rendering differs from ImGui
+        // Using 0.5f for very thin, delicate skeleton lines
         if (segment.Parent != null)
         {
-            drawList.AddLine(segment.Parent.Position, segment.Position, color, 0.75f);
+            drawList.AddLine(segment.Parent.Position, segment.Position, color, 0.5f);
         }
         
         // Skip drawing joint for root creature (it has no parent and doesn't need a visible joint)
@@ -909,13 +909,29 @@ public class SkeletileFollower : FollowerBase
         }
         
         // Draw joint - matching JS exactly: partial arc (3/4 circle) + triangle
-        // JS: var r = 4; (but this might be too large for the scaled down version)
-        // The JS version is scaled to 1/5 size, so r=4 becomes effectively smaller
-        // Using r=2.5f to account for the scaling and make it look more like a skeleton
-        var r = 2.5f;
+        // JS: var r = 4; but the creature is scaled to 1/5 size (0.2f), so effective radius is much smaller
+        // Also, canvas lineWidth=2 renders thinner than ImGui, so we need smaller radius
+        // For very small segments (like claws), skip joints entirely or make them tiny
+        // The joint should be barely visible - just a small arc with a point, not a circle
         var absAngle = segment.Parent != null 
             ? MathF.Atan2(segment.Position.Y - segment.Parent.Position.Y, segment.Position.X - segment.Parent.Position.X)
             : segment.AbsAngle;
+        
+        // Skip drawing joints for very small segments (like claws) - they should just be lines
+        // Small segments have size < 1.0 (like s * 0.1 or s * 3 for tiny details)
+        if (segment.Size < 1.0f)
+        {
+            // Very small segment - just draw children, no joint
+            foreach (var child in segment.Children)
+            {
+                DrawSegment(drawList, child, color);
+            }
+            return;
+        }
+        
+        // For normal segments, draw a very small, subtle joint
+        // Scale joint size based on segment size to keep proportions
+        var r = MathF.Min(0.5f, segment.Size * 0.15f); // Very small joints, scaled by segment size
         
         // JS: ctx.arc(this.x, this.y, r, Math.PI / 4 + this.absAngle, 7 * Math.PI / 4 + this.absAngle);
         // Draw partial arc from PI/4 to 7*PI/4 (3/4 circle) - matching JS exactly
@@ -923,9 +939,9 @@ public class SkeletileFollower : FollowerBase
         var endAngle = 7f * MathF.PI / 4f + absAngle;
         
         // Draw arc using line segments (JS uses ctx.arc which creates a smooth arc)
-        // Use appropriate number of segments for smooth arc without being too thick
+        // Use fewer segments for a more subtle, less "circle-like" appearance
         var arcPoints = new List<Vector2>();
-        const int arcSegments = 12; // Enough for smooth arc, not too many to look thick
+        const int arcSegments = 6; // Even fewer segments = less circle-like, more subtle
         for (int i = 0; i <= arcSegments; i++)
         {
             var t = i / (float)arcSegments;
@@ -936,13 +952,14 @@ public class SkeletileFollower : FollowerBase
             ));
         }
         
-        // Draw arc outline (JS strokes the arc) - use thin lines for skeleton
+        // Draw arc outline (JS strokes the arc) - use very thin lines for subtle joints
         for (int i = 0; i < arcPoints.Count - 1; i++)
         {
-            drawList.AddLine(arcPoints[i], arcPoints[i + 1], color, 0.75f);
+            drawList.AddLine(arcPoints[i], arcPoints[i + 1], color, 0.5f);
         }
         
         // Draw triangle pointing in direction of movement (matching JS exactly)
+        // This creates the small "point" at the joint, not a full circle
         // JS: ctx.moveTo(...), ctx.lineTo(...), ctx.lineTo(...), ctx.lineTo(...), ctx.stroke()
         var endPoint = new Vector2(
             segment.Position.X + r * MathF.Cos(7f * MathF.PI / 4f + absAngle),
@@ -957,11 +974,11 @@ public class SkeletileFollower : FollowerBase
             segment.Position.Y + r * MathF.Sin(MathF.PI / 4f + absAngle)
         );
         
-        // Draw triangle lines (JS strokes these) - thin lines for skeleton appearance
-        drawList.AddLine(endPoint, centerPoint, color, 0.75f);
-        drawList.AddLine(centerPoint, startPoint, color, 0.75f);
+        // Draw triangle lines (JS strokes these) - very thin lines for subtle joints
+        drawList.AddLine(endPoint, centerPoint, color, 0.5f);
+        drawList.AddLine(centerPoint, startPoint, color, 0.5f);
         // Close the triangle (connect start to end) - JS stroke() closes the path
-        drawList.AddLine(startPoint, endPoint, color, 0.75f);
+        drawList.AddLine(startPoint, endPoint, color, 0.5f);
         
         // Recursively draw children (matching JS: if (iter) { children[i].draw(true); })
         foreach (var child in segment.Children)
