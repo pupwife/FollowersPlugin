@@ -3,7 +3,7 @@
     "Author": "pupwife",
     "Name": "Followers",
     "InternalName": "Followers",
-    "AssemblyVersion": "4.2.1.0",
+    "AssemblyVersion": "4.3.0.0",
     "Punchline": "Cute followers that follow your cursor around the screen.",
     "Description": "A plugin that adds followers that follow your cursor around the entire screen, not limited to Dalamud windows. Includes Fish2D, Dragon, and Skeletile followers.",
     "ApplicableVersion": "any",

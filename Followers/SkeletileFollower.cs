@@ -10,6 +10,22 @@ public class SkeletileFollower : FollowerBase
     public override string Name => "Skeletile";
     public override bool CanRegenerate => true;
     
+    // ========== HUNTER/STALKER PERSONALITY CONSTANTS ==========
+    private const float IDLE_THRESHOLD = 1200f; // ms before cursor is considered idle
+    private const float IDLE_RADIUS = 25f; // Pixels - cursor must stay within this radius to be "idle"
+    private const float COIL_RADIUS = IDLE_RADIUS; // Match the idle radius for coiling
+    private const float STALK_DISTANCE = 250f; // How far behind to lag (stalking distance)
+    private const float POUNCE_TRIGGER = 2500f; // ms of being idle before pouncing
+    private const float LAG_SPEED = 0.1f; // How fast stalk position catches up (0-1, lower = more lag)
+    private const float AGGRESSION_INCREASE_RATE = 0.0005f; // How fast aggression builds (per ms)
+    private const int HISTORY_SIZE = 10;
+    
+    private class CursorHistoryEntry
+    {
+        public Vector2 Position;
+        public float Time;
+    }
+    
     private class Segment
     {
         public Vector2 Position;
@@ -48,7 +64,7 @@ public class SkeletileFollower : FollowerBase
         
         public void UpdateRelative(bool iter, bool flex)
         {
-            if (Parent == null) return; // Root segment (Creature) doesn't update relative
+            if (Parent == null) return;
             
             RelAngle = RelAngle - 2f * MathF.PI * MathF.Floor((RelAngle - DefaultAngle) / (2f * MathF.PI) + 0.5f);
             
@@ -252,6 +268,14 @@ public class SkeletileFollower : FollowerBase
         }
     }
     
+    private enum PounceState
+    {
+        None,
+        Approaching,
+        Attacking,
+        Wrapping
+    }
+    
     private class Creature : Segment
     {
         public float FSpeed;
@@ -287,14 +311,10 @@ public class SkeletileFollower : FollowerBase
             IsSegment = false;
         }
         
-        public void Follow(float x, float y, float deltaTime)
+        public void Follow(float targetX, float targetY, float dist, float targetAngle,
+            bool isPouncing, bool isCoiling, PounceState pounceState, bool isBrute, float sneakyLevel,
+            float aggressionLevel, float deltaTimeMs)
         {
-            // Simplified follow behavior - move towards cursor
-            var dx = x - Position.X;
-            var dy = y - Position.Y;
-            var dist = MathF.Sqrt(dx * dx + dy * dy);
-            var targetAngle = MathF.Atan2(y - Position.Y, x - Position.X);
-            
             // Update forward movement
             var accel = FAccel;
             if (Systems.Count > 0)
@@ -310,6 +330,41 @@ public class SkeletileFollower : FollowerBase
                 accel *= sum / (float)Systems.Count;
             }
             
+            // Adjust acceleration based on behavior and personality
+            if (isCoiling)
+            {
+                accel *= 0.3f;
+            }
+            else if (pounceState == PounceState.Wrapping)
+            {
+                accel *= 1.8f + aggressionLevel * 0.3f;
+            }
+            else if (pounceState == PounceState.Attacking)
+            {
+                accel *= 4.0f + aggressionLevel * 1.0f;
+            }
+            else if (pounceState == PounceState.Approaching)
+            {
+                var basePounceSpeed = isBrute ? 2.5f : 2.0f;
+                var aggressionBoost = aggressionLevel * (isBrute ? 1.0f : 0.5f);
+                accel *= basePounceSpeed + aggressionBoost;
+            }
+            else if (isPouncing)
+            {
+                accel *= 2.0f;
+            }
+            else
+            {
+                if (isBrute)
+                {
+                    accel *= 0.8f + aggressionLevel * 0.3f;
+                }
+                else
+                {
+                    accel *= 0.7f + aggressionLevel * 0.2f * sneakyLevel;
+                }
+            }
+            
             FSpeed += accel * (dist > FThresh ? 1 : 0);
             FSpeed *= 1f - FRes;
             Speed = MathF.Max(0, FSpeed - FFric);
@@ -318,9 +373,43 @@ public class SkeletileFollower : FollowerBase
             var dif = AbsAngle - targetAngle;
             dif -= 2f * MathF.PI * MathF.Floor(dif / (2f * MathF.PI) + 0.5f);
             
+            var rotationAccel = RAccel;
+            
+            if (pounceState == PounceState.Wrapping)
+            {
+                rotationAccel = RAccel * 1.5f * (1 + aggressionLevel * 0.3f);
+            }
+            else if (pounceState == PounceState.Attacking)
+            {
+                rotationAccel = RAccel * 3.0f * (1 + aggressionLevel * 0.5f);
+            }
+            else if (pounceState == PounceState.Approaching)
+            {
+                rotationAccel = RAccel * (isBrute ? 2.5f : 2.0f) * (1 + aggressionLevel * 0.3f);
+            }
+            else if (isPouncing)
+            {
+                rotationAccel = RAccel * 2.0f * (1 + aggressionLevel * 0.3f);
+            }
+            else if (isCoiling)
+            {
+                rotationAccel = RAccel * 0.6f;
+            }
+            else
+            {
+                if (isBrute)
+                {
+                    rotationAccel = RAccel * (1 + aggressionLevel * 0.4f);
+                }
+                else
+                {
+                    rotationAccel = RAccel * (0.9f + aggressionLevel * 0.3f * sneakyLevel);
+                }
+            }
+            
             if (MathF.Abs(dif) > RThresh && dist > FThresh)
             {
-                RSpeed -= RAccel * (dif > 0 ? 1 : -1);
+                RSpeed -= rotationAccel * (dif > 0 ? 1 : -1);
             }
             RSpeed *= 1f - RRes;
             if (MathF.Abs(RSpeed) > RFric)
@@ -347,7 +436,7 @@ public class SkeletileFollower : FollowerBase
             }
             foreach (var system in Systems)
             {
-                system.Update(x, y);
+                system.Update(targetX, targetY);
             }
             AbsAngle -= MathF.PI;
         }
@@ -358,6 +447,21 @@ public class SkeletileFollower : FollowerBase
     private float creatureSize;
     private Random random = null!;
     
+    // ========== HUNTER/STALKER STATE ==========
+    private List<CursorHistoryEntry> cursorHistory = new();
+    private Vector2 lastMousePos = Vector2.Zero;
+    private float cursorIdleTime = 0f;
+    private float huntTimer = 0f;
+    private Vector2 stalkPosition = Vector2.Zero;
+    private float pounceTimer = 0f;
+    private bool hasPounced = false;
+    private float lastCoilTime = 0f;
+    private float aggressionLevel = 0f;
+    private float coilAngle = 0f;
+    private PounceState pounceState = PounceState.None;
+    private float wrapRadius = COIL_RADIUS;
+    private DateTime lastFrameTime = DateTime.Now;
+    
     public override void Initialize()
     {
         base.Initialize();
@@ -367,26 +471,42 @@ public class SkeletileFollower : FollowerBase
         var centerX = viewport.Size.X / 2f;
         var centerY = viewport.Size.Y / 2f;
         
-        // Generate random creature parameters
-        // Leg count should be even and scale with length
-        var tailLength = random.Next(4, 20);
-        // More legs for longer creatures: base 2 legs, add 2 per ~3 tail segments
-        // This gives: 4 tail = 2 legs, 7 tail = 4 legs, 10 tail = 6 legs, 13 tail = 8 legs, 16 tail = 10 legs, 19 tail = 12 legs
-        legCount = 2 + (tailLength / 3) * 2;
-        // Ensure even number
-        if (legCount % 2 != 0) legCount++;
-        // Cap at reasonable max (12 legs = 6 pairs)
-        legCount = Math.Min(legCount, 12);
-        // Ensure minimum of 2 legs
-        legCount = Math.Max(legCount, 2);
+        // Generate random creature parameters - matching JS exactly
+        // JS: legCount = Math.floor(1 + Math.random() * 12); // 1-12 legs
+        legCount = random.Next(1, 13); // 1-12 legs
+        var baseSize = 8f / MathF.Sqrt(legCount);
+        var sizeVariation = 0.8f + (float)random.NextDouble() * 0.4f;
+        var scaledSize = baseSize * 0.2f * sizeVariation;
         
-        creatureSize = 0.8f + (float)random.NextDouble() * 0.4f;
-        var baseSize = 8f / MathF.Sqrt(legCount) * 0.2f * creatureSize;
-        
-        // Calculate speed multiplier based on leg count
+        // Calculate speed multiplier based on leg count (matching JS)
+        // JS: const speedMultiplier = 0.5 + (legCount - 1) * (2.5 / 11);
         var speedMultiplier = 0.5f + (legCount - 1) * (2.5f / 11f);
         
-        SetupLizard(baseSize, legCount, tailLength, speedMultiplier);
+        // JS: Math.floor(4 + Math.random() * legCount * 8)
+        var tailLength = random.Next(4, legCount * 8 + 4);
+        
+        // Ensure even number of legs (half on each side) - done after tail calculation to match JS
+        if (legCount % 2 != 0) legCount++;
+        legCount = Math.Min(legCount, 12);
+        legCount = Math.Max(legCount, 2);
+        creatureSize = sizeVariation;
+        
+        SetupLizard(scaledSize, legCount, tailLength, speedMultiplier);
+        
+        // Initialize hunting state
+        lastFrameTime = DateTime.Now;
+        stalkPosition = new Vector2(centerX, centerY);
+        cursorIdleTime = 0f;
+        pounceTimer = 0f;
+        hasPounced = false;
+        cursorHistory.Clear();
+        lastCoilTime = 0f;
+        aggressionLevel = 0f;
+        coilAngle = 0f;
+        huntTimer = 0f;
+        pounceState = PounceState.None;
+        wrapRadius = COIL_RADIUS;
+        lastMousePos = new Vector2(centerX, centerY);
     }
     
     private void SetupLizard(float size, int legs, int tail, float speedMultiplier)
@@ -479,8 +599,275 @@ public class SkeletileFollower : FollowerBase
         
         if (critter == null) return;
         
-        // Update creature with physics
-        critter.Follow(cursorPos.X, cursorPos.Y, deltaTime);
+        // Convert deltaTime from seconds to milliseconds for JS compatibility
+        var deltaTimeMs = deltaTime * 1000f;
+        
+        // Calculate distance to actual cursor
+        var distToCursor = Vector2.Distance(critter.Position, cursorPos);
+        
+        // ========== AGGRESSION SYSTEM ==========
+        var currentTime = (float)(DateTime.Now - new DateTime(1970, 1, 1)).TotalMilliseconds;
+        var timeSinceLastCoil = currentTime - lastCoilTime;
+        
+        if (distToCursor > COIL_RADIUS * 2)
+        {
+            // Not coiled - increase aggression
+            aggressionLevel = MathF.Min(1.0f, aggressionLevel + (deltaTimeMs * AGGRESSION_INCREASE_RATE));
+        }
+        else if (distToCursor < COIL_RADIUS && cursorIdleTime > IDLE_THRESHOLD)
+        {
+            // Successfully coiled! Reset aggression
+            if (lastCoilTime == 0 || timeSinceLastCoil > 1000)
+            {
+                lastCoilTime = currentTime;
+                aggressionLevel = 0;
+            }
+        }
+        
+        // Update hunt timer
+        huntTimer += deltaTimeMs;
+        
+        // Determine personality based on leg count
+        var legCountForPersonality = legCount;
+        var isBrute = legCountForPersonality <= 4;
+        var sneakyLevel = legCountForPersonality >= 8 ? 1.0f : MathF.Max(0, (legCountForPersonality - 4) / 4f);
+        var isAnaconda = legCountForPersonality >= 8;
+        
+        // Update cursor tracking
+        var mouseMoved = MathF.Abs(cursorPos.X - lastMousePos.X) > 1 || MathF.Abs(cursorPos.Y - lastMousePos.Y) > 1;
+        var cursorMovementDist = Vector2.Distance(cursorPos, lastMousePos);
+        
+        if (mouseMoved && cursorMovementDist > IDLE_RADIUS)
+        {
+            // Cursor moved significantly - reset idle tracking
+            cursorIdleTime = 0;
+            pounceTimer = 0;
+            hasPounced = false;
+            cursorHistory.Add(new CursorHistoryEntry { Position = cursorPos, Time = currentTime });
+            if (cursorHistory.Count > HISTORY_SIZE)
+            {
+                cursorHistory.RemoveAt(0);
+            }
+        }
+        else
+        {
+            // Check if cursor is within idle radius
+            if (cursorHistory.Count > 0)
+            {
+                var lastPos = cursorHistory[cursorHistory.Count - 1].Position;
+                var distFromLastPos = Vector2.Distance(cursorPos, lastPos);
+                if (distFromLastPos < IDLE_RADIUS)
+                {
+                    cursorIdleTime += deltaTimeMs;
+                    pounceTimer += deltaTimeMs;
+                }
+                else
+                {
+                    cursorIdleTime = 0;
+                    pounceTimer = 0;
+                    hasPounced = false;
+                }
+            }
+            else
+            {
+                cursorIdleTime += deltaTimeMs;
+                pounceTimer += deltaTimeMs;
+            }
+        }
+        
+        lastMousePos = cursorPos;
+        
+        // ========== PERSONALITY-BASED STALKING BEHAVIOR ==========
+        var baseStalkDistance = STALK_DISTANCE;
+        
+        if (isBrute)
+        {
+            baseStalkDistance = STALK_DISTANCE * (1 - aggressionLevel * 0.5f);
+        }
+        else
+        {
+            baseStalkDistance = STALK_DISTANCE * (1 + sneakyLevel * 0.3f);
+            if (aggressionLevel > 0.5f)
+            {
+                var restlessOffset = MathF.Sin(aggressionLevel * MathF.PI * 4) * 40 * aggressionLevel;
+                baseStalkDistance += restlessOffset;
+            }
+        }
+        
+        // Calculate ideal stalking position (behind cursor)
+        var angleToCursor = MathF.Atan2(cursorPos.Y - stalkPosition.Y, cursorPos.X - stalkPosition.X);
+        
+        // Brute: Direct approach, Sneaky: Offset angle for indirect approach
+        var stalkOffsetAngle = 0f;
+        if (!isBrute && sneakyLevel > 0.3f)
+        {
+            stalkOffsetAngle = MathF.Sin(aggressionLevel * MathF.PI * 2 + huntTimer / 200f) * 0.4f * sneakyLevel;
+        }
+        
+        var idealStalkX = cursorPos.X - MathF.Cos(angleToCursor + stalkOffsetAngle) * baseStalkDistance;
+        var idealStalkY = cursorPos.Y - MathF.Sin(angleToCursor + stalkOffsetAngle) * baseStalkDistance;
+        
+        // Smoothly move stalk position towards ideal position (with lag)
+        var currentLagSpeed = isBrute ? LAG_SPEED * 1.5f : LAG_SPEED * (0.7f + sneakyLevel * 0.3f);
+        var stalkDist = Vector2.Distance(new Vector2(idealStalkX, idealStalkY), stalkPosition);
+        if (stalkDist > 5)
+        {
+            stalkPosition.X += (idealStalkX - stalkPosition.X) * currentLagSpeed;
+            stalkPosition.Y += (idealStalkY - stalkPosition.Y) * currentLagSpeed;
+        }
+        
+        // ========== POUNCE BEHAVIOR ==========
+        var adjustedPounceTrigger = isBrute
+            ? POUNCE_TRIGGER * (1 - aggressionLevel * 0.5f)
+            : POUNCE_TRIGGER * (1 + sneakyLevel * 0.3f);
+        
+        var isPouncing = false;
+        var isCoiling = false;
+        
+        // Check if close enough to coil (even without pounce)
+        var shouldCoil = distToCursor < COIL_RADIUS && cursorIdleTime > IDLE_THRESHOLD && pounceState == PounceState.None;
+        
+        // Update pounce state machine
+        if (pounceTimer > adjustedPounceTrigger && !hasPounced && !shouldCoil)
+        {
+            if (pounceState == PounceState.None)
+            {
+                pounceState = PounceState.Approaching;
+                hasPounced = true;
+                isPouncing = true;
+            }
+        }
+        
+        // Transition from approaching to attacking/ouroboros when close
+        if (pounceState == PounceState.Approaching && distToCursor < STALK_DISTANCE * 0.5f)
+        {
+            if (isAnaconda)
+            {
+                pounceState = PounceState.Wrapping;
+                wrapRadius = COIL_RADIUS * 1.2f;
+            }
+            else
+            {
+                pounceState = PounceState.Attacking;
+            }
+        }
+        
+        // Transition from wrapping/attacking to coiling when very close and stable
+        var isCloseEnough = isAnaconda
+            ? (distToCursor < COIL_RADIUS * 2 && cursorIdleTime > 500)
+            : (distToCursor < COIL_RADIUS * 0.5f);
+        
+        if ((pounceState == PounceState.Wrapping || pounceState == PounceState.Attacking) &&
+            isCloseEnough && cursorIdleTime > 300)
+        {
+            if (isAnaconda && distToCursor < COIL_RADIUS * 1.5f)
+            {
+                // Keep ouroboros going
+            }
+            else if (!isAnaconda)
+            {
+                pounceState = PounceState.None;
+                hasPounced = false;
+                isCoiling = true;
+                wrapRadius = COIL_RADIUS;
+            }
+        }
+        
+        // If cursor moves away during pounce, abort and reset
+        if (pounceState != PounceState.None && distToCursor > STALK_DISTANCE * 1.5f)
+        {
+            pounceState = PounceState.None;
+            hasPounced = false;
+            isPouncing = false;
+            wrapRadius = COIL_RADIUS;
+        }
+        
+        // Normal idle coiling (when not pouncing)
+        if (shouldCoil && pounceState == PounceState.None)
+        {
+            isCoiling = true;
+        }
+        
+        // Calculate target position based on behavior
+        var targetX = stalkPosition.X;
+        var targetY = stalkPosition.Y;
+        var targetAngle = MathF.Atan2(targetY - critter.Position.Y, targetX - critter.Position.X);
+        var dist = Vector2.Distance(critter.Position, new Vector2(targetX, targetY));
+        
+        // ========== POUNCE BEHAVIORS ==========
+        if (pounceState == PounceState.Wrapping)
+        {
+            // OUROBOROS MODE: Pace around cursor in tight perpetual circle
+            isPouncing = true;
+            
+            var baseOuroborosRadius = COIL_RADIUS * 1.1f;
+            var radiusVariation = MathF.Sin(aggressionLevel * MathF.PI * 2 + huntTimer / 500f) * (COIL_RADIUS * 0.2f);
+            wrapRadius = baseOuroborosRadius + radiusVariation;
+            
+            var rotationSpeed = 0.004f + aggressionLevel * 0.002f;
+            coilAngle += deltaTimeMs * rotationSpeed;
+            if (coilAngle > MathF.PI * 2) coilAngle -= MathF.PI * 2;
+            
+            var circleX = cursorPos.X + MathF.Cos(coilAngle) * wrapRadius;
+            var circleY = cursorPos.Y + MathF.Sin(coilAngle) * wrapRadius;
+            
+            targetX = circleX;
+            targetY = circleY;
+            targetAngle = MathF.Atan2(circleY - critter.Position.Y, circleX - critter.Position.X);
+            dist = Vector2.Distance(critter.Position, new Vector2(circleX, circleY));
+        }
+        else if (pounceState == PounceState.Attacking)
+        {
+            // BRUTE MODE: Direct attack
+            isPouncing = true;
+            
+            var attackOffset = MathF.Min(5, distToCursor * 0.1f);
+            var angleToCursor2 = MathF.Atan2(cursorPos.Y - critter.Position.Y, cursorPos.X - critter.Position.X);
+            targetX = cursorPos.X - MathF.Cos(angleToCursor2) * attackOffset;
+            targetY = cursorPos.Y - MathF.Sin(angleToCursor2) * attackOffset;
+            targetAngle = MathF.Atan2(targetY - critter.Position.Y, targetX - critter.Position.X);
+            dist = distToCursor * 4.0f;
+        }
+        else if (pounceState == PounceState.Approaching)
+        {
+            // Still approaching during pounce
+            isPouncing = true;
+            
+            if (isBrute)
+            {
+                targetX = cursorPos.X;
+                targetY = cursorPos.Y;
+            }
+            else
+            {
+                var curveAmount = (1 - aggressionLevel) * 30;
+                var angleToCursor2 = MathF.Atan2(cursorPos.Y - critter.Position.Y, cursorPos.X - critter.Position.X);
+                var curveAngle = angleToCursor2 + MathF.Sin(huntTimer / 100f) * (curveAmount / STALK_DISTANCE);
+                targetX = cursorPos.X - MathF.Cos(curveAngle) * curveAmount;
+                targetY = cursorPos.Y - MathF.Sin(curveAngle) * curveAmount;
+            }
+            targetAngle = MathF.Atan2(targetY - critter.Position.Y, targetX - critter.Position.X);
+            dist = distToCursor * (1.5f + aggressionLevel * 0.5f);
+        }
+        else if (isCoiling)
+        {
+            // Normal idle coiling: curl around cursor in a proper circle
+            coilAngle += deltaTimeMs * 0.003f;
+            if (coilAngle > MathF.PI * 2) coilAngle -= MathF.PI * 2;
+            
+            var coilRadius = COIL_RADIUS;
+            var circleX = cursorPos.X + MathF.Cos(coilAngle) * coilRadius;
+            var circleY = cursorPos.Y + MathF.Sin(coilAngle) * coilRadius;
+            
+            targetX = circleX;
+            targetY = circleY;
+            targetAngle = MathF.Atan2(circleY - critter.Position.Y, circleX - critter.Position.X);
+            dist = Vector2.Distance(critter.Position, new Vector2(circleX, circleY)) * 0.3f;
+        }
+        
+        // Update creature with full physics (matching JS exactly)
+        critter.Follow(targetX, targetY, dist, targetAngle, isPouncing, isCoiling, pounceState, 
+            isBrute, sneakyLevel, aggressionLevel, deltaTimeMs);
     }
     
     public override void Draw()
@@ -488,31 +875,57 @@ public class SkeletileFollower : FollowerBase
         if (!isActive || critter == null) return;
         
         var drawList = ImGui.GetForegroundDrawList();
-        var color = ImGui.ColorConvertFloat4ToU32(new Vector4(0.91f, 0.91f, 0.85f, 1f)); // Bone color
         
+        // Match JS color: strokeColor based on theme
+        // JS uses: isDarkMode ? '#e8e8d8' : '#000000'
+        // For Dalamud (typically dark), use the bone color
+        // #e8e8d8 = rgb(232, 232, 216)
+        var color = ImGui.ColorConvertFloat4ToU32(new Vector4(0.91f, 0.91f, 0.85f, 1f)); // #e8e8d8 bone color
+        
+        // Draw root creature and all children (matching JS: critter.draw(true))
         DrawSegment(drawList, critter, color);
     }
     
     private void DrawSegment(ImDrawListPtr drawList, Segment segment, uint color)
     {
+        // Draw line from parent to this segment (matching JS draw method exactly)
+        // JS: ctx.lineWidth = 2, but for skeleton appearance we want thinner lines
+        // Using 0.75f for delicate skeleton appearance
         if (segment.Parent != null)
         {
-            drawList.AddLine(segment.Parent.Position, segment.Position, color, 1f);
+            drawList.AddLine(segment.Parent.Position, segment.Position, color, 0.75f);
         }
         
-        // Draw joint - matching JS: partial arc (3/4 circle) + triangle
-        var r = 2f;
+        // Skip drawing joint for root creature (it has no parent and doesn't need a visible joint)
+        // Only draw joint for segments that have a parent (matching JS behavior)
+        if (segment.Parent == null)
+        {
+            // Root creature - just draw children
+            foreach (var child in segment.Children)
+            {
+                DrawSegment(drawList, child, color);
+            }
+            return;
+        }
+        
+        // Draw joint - matching JS exactly: partial arc (3/4 circle) + triangle
+        // JS: var r = 4; (but this might be too large for the scaled down version)
+        // The JS version is scaled to 1/5 size, so r=4 becomes effectively smaller
+        // Using r=2.5f to account for the scaling and make it look more like a skeleton
+        var r = 2.5f;
         var absAngle = segment.Parent != null 
             ? MathF.Atan2(segment.Position.Y - segment.Parent.Position.Y, segment.Position.X - segment.Parent.Position.X)
             : segment.AbsAngle;
         
-        // Draw partial arc from PI/4 to 7*PI/4 (3/4 circle)
+        // JS: ctx.arc(this.x, this.y, r, Math.PI / 4 + this.absAngle, 7 * Math.PI / 4 + this.absAngle);
+        // Draw partial arc from PI/4 to 7*PI/4 (3/4 circle) - matching JS exactly
         var startAngle = MathF.PI / 4f + absAngle;
         var endAngle = 7f * MathF.PI / 4f + absAngle;
         
-        // Draw arc using multiple line segments
+        // Draw arc using line segments (JS uses ctx.arc which creates a smooth arc)
+        // Use appropriate number of segments for smooth arc without being too thick
         var arcPoints = new List<Vector2>();
-        const int arcSegments = 24; // 3/4 of 32 segments
+        const int arcSegments = 12; // Enough for smooth arc, not too many to look thick
         for (int i = 0; i <= arcSegments; i++)
         {
             var t = i / (float)arcSegments;
@@ -523,13 +936,14 @@ public class SkeletileFollower : FollowerBase
             ));
         }
         
-        // Draw arc outline
+        // Draw arc outline (JS strokes the arc) - use thin lines for skeleton
         for (int i = 0; i < arcPoints.Count - 1; i++)
         {
-            drawList.AddLine(arcPoints[i], arcPoints[i + 1], color, 1f);
+            drawList.AddLine(arcPoints[i], arcPoints[i + 1], color, 0.75f);
         }
         
-        // Draw triangle pointing in direction of movement
+        // Draw triangle pointing in direction of movement (matching JS exactly)
+        // JS: ctx.moveTo(...), ctx.lineTo(...), ctx.lineTo(...), ctx.lineTo(...), ctx.stroke()
         var endPoint = new Vector2(
             segment.Position.X + r * MathF.Cos(7f * MathF.PI / 4f + absAngle),
             segment.Position.Y + r * MathF.Sin(7f * MathF.PI / 4f + absAngle)
@@ -543,9 +957,13 @@ public class SkeletileFollower : FollowerBase
             segment.Position.Y + r * MathF.Sin(MathF.PI / 4f + absAngle)
         );
         
-        drawList.AddLine(endPoint, centerPoint, color, 1f);
-        drawList.AddLine(centerPoint, startPoint, color, 1f);
+        // Draw triangle lines (JS strokes these) - thin lines for skeleton appearance
+        drawList.AddLine(endPoint, centerPoint, color, 0.75f);
+        drawList.AddLine(centerPoint, startPoint, color, 0.75f);
+        // Close the triangle (connect start to end) - JS stroke() closes the path
+        drawList.AddLine(startPoint, endPoint, color, 0.75f);
         
+        // Recursively draw children (matching JS: if (iter) { children[i].draw(true); })
         foreach (var child in segment.Children)
         {
             DrawSegment(drawList, child, color);
@@ -562,5 +980,6 @@ public class SkeletileFollower : FollowerBase
     {
         base.Cleanup();
         critter = null;
+        cursorHistory.Clear();
     }
 }
